@@ -212,9 +212,9 @@ def joue_aléatoirement():
     
 
 # Temps 
-global prout, superprout
+global tailleAjoutFenetre
 nombrePartie = 0
-
+tailleAjoutFenetre = 200 #taille sumplémentaire de la fenetre IA pour ajout d'informations
 
 
 # Application
@@ -238,6 +238,7 @@ while run:
         if event.type == pygame.QUIT:
             run = False
         
+        
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y = event.pos
             
@@ -252,7 +253,10 @@ while run:
                     #MODE IA
                     etat_app = 'jeu_ia'
                     dernier_mouvement_temps = 0
-                    intervale_temps = 50
+                    intervale_temps = 1000
+                    screen = pygame.display.set_mode((width + tailleAjoutFenetre, height))
+
+                
             
             #JEU_HUMAIN
             elif etat_app == 'jeu_humain':
@@ -310,6 +314,7 @@ while run:
                 list_serpent.append([ancien_serpent_x,ancien_serpent_y,Type_case.SERPENT_CORPS,ancien_serpent_direction])
                 score += 1
                 maj_affichage_score(score)
+            
 
                 
     # Selection de l'ecran
@@ -433,6 +438,8 @@ while run:
     
         if not jeu_cree:
             screen.fill(WHITE)
+            pygame.draw.rect(screen, FOND, (width, 0, tailleAjoutFenetre, height))
+
             creation_jeu_ia()
             jeu_cree = True
         
