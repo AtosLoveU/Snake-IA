@@ -82,15 +82,15 @@ def coordonnées_case(case):
 global jeu_cree
 jeu_cree = False
 def creation_jeu_humain():
-    global bouton_restart_jeu_humain, bouton_menu_jeu_humain, score
+    global bouton_restart_jeu_humain, bouton_menu_jeu_humain, score, cycle
     score = 0
+    cycle = 0
     width_game = 594 #longueur du jeu
     
     # Zone externe au jeu
     pygame.draw.rect(screen, FOND, (width_game, 0, 200+6, 600))
     pygame.draw.line(screen, BLACK, (width_game, 0), (width_game, height), 2)   
 
-    placement_serpent_pomme_depart()
     bouton_menu_jeu_humain = pygame.draw.rect(screen, GRAY, (635, 410, 130, 60))
     text_surface = font40.render("Menu", True, BLACK)
     text_rect = text_surface.get_rect(center=(700, 440))
@@ -104,48 +104,46 @@ def creation_jeu_humain():
     text_surface = font40.render("Score : ", True, BLACK)
     text_rect = text_surface.get_rect(center=(680,50))
     screen.blit(text_surface, text_rect)
+    
+    text_surface = font40.render("Cycle : ", True, BLACK)
+    text_rect = text_surface.get_rect(center=(670,110))
+    screen.blit(text_surface, text_rect)
+    
+    placement_serpent_pomme_depart()
     maj_affichage_score(0)
+    maj_affichage_cycle(0)
+    
     placement_pomme()
 
 def creation_jeu_ia():
-    global bouton_restart_jeu_ia, bouton_menu_jeu_ia, score
+    global bouton_restart_jeu_ia, bouton_menu_jeu_ia, score, cycle
     score = 0
+    cycle = 0
     width_game = 594 #longueur du jeu
     
     # Zone externe au jeu
     pygame.draw.rect(screen, FOND, (width_game, 0, 200+6, 600))
     pygame.draw.line(screen, BLACK, (width_game, 0), (width_game, height), 2)   
 
-    placement_serpent_pomme_depart()
+    
     bouton_menu_jeu_ia = pygame.draw.rect(screen, GRAY, (635, 410, 130, 60))
     text_surface = font40.render("Menu", True, BLACK)
     text_rect = text_surface.get_rect(center=(700, 440))
-    screen.blit(text_surface, text_rect)
-
-    bouton_restart_jeu_ia = pygame.draw.rect(screen, GRAY, (635, 330, 130, 60))
-    text_surface = font40.render("Restart", True, BLACK)
-    text_rect = text_surface.get_rect(center=(700, 360))
     screen.blit(text_surface, text_rect)
     
     text_surface = font40.render("Score : ", True, BLACK)
     text_rect = text_surface.get_rect(center=(680,50))
     screen.blit(text_surface, text_rect)
+    
+    text_surface = font40.render("Cycle : ", True, BLACK)
+    text_rect = text_surface.get_rect(center=(680,110))
+    screen.blit(text_surface, text_rect)
+    
+    placement_serpent_pomme_depart()
     maj_affichage_score(0)
+    maj_affichage_cycle(0)
+    
     placement_pomme()
-    
-
-    
-def est_serpent_corps(case):
-    if(case[2] == Type_case.SERPENT_CORPS.value): 
-        return True
-    
-def est_serpent_tete(case):
-    if(case[2] == Type_case.SERPENT_TETE.value):
-        return True
-    
-def est_pomme(case):
-    if(case[2] == Type_case.POMME.value):
-        return True
     
 def modif_type_case(case, nouveau_type):
     list_case[numeroCaseDans_liste_case(case)][2] = nouveau_type.value
@@ -153,23 +151,19 @@ def modif_type_case(case, nouveau_type):
 def modif_direction_serpent(case,nouvel_direction):
     list_case[numeroCaseDans_liste_case(case)][3] = nouvel_direction.value
 
-
 def placement_serpent_pomme_depart():
+    global serpentTete, list_serpent
     serpent1 = [4,7,Type_case.SERPENT_CORPS,Type_direction.DROITE]
     serpent2 = [5,7,Type_case.SERPENT_CORPS,Type_direction.DROITE]
     serpent3 = [6,7,Type_case.SERPENT_CORPS,Type_direction.DROITE]
-    global serpentTete
     serpentTete = [7,7,Type_case.SERPENT_TETE,Type_direction.DROITE]
-    pomme = [13,7]
     #placement du serpent
     modif_type_case([serpent1[0],serpent1[1]], Type_case.SERPENT_CORPS)
     modif_type_case([serpent2[0],serpent2[1]], Type_case.SERPENT_CORPS)
     modif_type_case([serpent3[0],serpent3[1]], Type_case.SERPENT_CORPS)
     modif_type_case([serpentTete[0],serpentTete[1]], Type_case.SERPENT_TETE)
-    
-    #placement de la pomme
+    pomme = [0,0]
     modif_type_case(pomme, Type_case.POMME)
-    global list_serpent
     list_serpent = [serpent3,serpent2,serpent1]
     
     # pygame.draw.rect(screen, SERPENT_TETE_COULEUR, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1], taille_case, taille_case))
@@ -198,6 +192,12 @@ def maj_affichage_score(score):
     text_rect = text_surface.get_rect(center=(755,52))
     screen.blit(text_surface, text_rect)
     
+def maj_affichage_cycle(cycle):
+    pygame.draw.rect(screen, FOND, (730, 87, 50, 50))
+    text_surface = font40.render(str(cycle), True, BLACK)
+    text_rect = text_surface.get_rect(center=(755,112))
+    screen.blit(text_surface, text_rect)
+    
 def joue_aléatoirement():
     rdm = random.randint(1, 4)
     if rdm == 1:
@@ -212,36 +212,47 @@ def joue_aléatoirement():
     
 
 # Temps 
+global prout, superprout
+nombrePartie = 0
 
-dernier_mouvement_temps = 0
-#intervalle de tick
-intervale_temps = 50
 
-cycle = 0
 
 # Application
 run = True
 while run:
     temps_actuel = pygame.time.get_ticks()
-    
+    """
+    if etat_app == 'jeu_perdu_ia':
+            
+            if score < 2:
+                nombrePartie += 1
+                jeu_cree = False
+                etat_app = 'jeu_ia'
+            else:
+                print("Nombre de partie pour atteindre 2 : " + str(nombrePartie))
+                nombrePartie = 0
+                break
+    """
+                
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
+        
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y = event.pos
-            
-      
-            
             
             #MENU
             if etat_app == 'menu':
                 if bouton_menu_humain.collidepoint(x, y):
                     #MODE HUMAIN
                     etat_app = 'jeu_humain'
-                
+                    dernier_mouvement_temps = 0
+                    intervale_temps = 200
                 if bouton_menu_IA.collidepoint(x, y):
                     #MODE IA
-                    etat_app = 'jeu_IA'
+                    etat_app = 'jeu_ia'
+                    dernier_mouvement_temps = 0
+                    intervale_temps = 50
             
             #JEU_HUMAIN
             elif etat_app == 'jeu_humain':
@@ -254,14 +265,8 @@ while run:
                     jeu_cree = False
                     etat_app = 'menu'
             
-            #JEU_IA
+            #jeu_ia
             elif etat_app == 'jeu_ia':
-                if bouton_restart_jeu_ia.collidepoint(x, y):
-                    # Réinitialisation du jeu
-                    print('a')
-                    jeu_cree = False
-                    etat_app = 'jeu_ia'
-                    
                 if bouton_menu_jeu_ia.collidepoint(x,y):
                     jeu_cree = False
                     etat_app = 'menu'
@@ -278,18 +283,15 @@ while run:
                     etat_app = 'menu'
             #PERDU_IA
             elif etat_app == 'jeu_perdu_ia':
-                print("bb")
+                
                 if bouton_restart_perdu_ia.collidepoint(x, y):
                     jeu_cree = False
                     etat_app = 'jeu_ia'
-                    print("cc")
-                    print(etat_app)
-                    print(jeu_cree)
-
-                if bouton_menu_perdu_ia.collidepoint(x, y):
+                    
+                if bouton_menu_jeu_ia.collidepoint(x, y):
                     jeu_cree = False
                     etat_app = 'menu'
-                    
+
         if event.type == pygame.KEYDOWN:
             if (event.key == pygame.K_UP or event.key == pygame.K_z) and serpentTete[3] != Type_direction.BAS and not choix_direction:  # aller en haut
                 serpentTete[3] = Type_direction.HAUT
@@ -340,6 +342,9 @@ while run:
         #cycle temps du jeu
         if temps_actuel - dernier_mouvement_temps >= intervale_temps:
             choix_direction = False
+            cycle += 1
+            maj_affichage_cycle(cycle)
+
             dernier_mouvement_temps = temps_actuel            
             direction = serpentTete[3].value
             x,y = serpentTete[0],serpentTete[1]
@@ -424,16 +429,17 @@ while run:
 
 
            
-    elif etat_app == 'jeu_IA':
+    elif etat_app == 'jeu_ia':
     
         if not jeu_cree:
-            print("aa")
             screen.fill(WHITE)
             creation_jeu_ia()
             jeu_cree = True
         
         #cycle temps du jeu
         if temps_actuel - dernier_mouvement_temps >= intervale_temps:
+            cycle += 1
+            maj_affichage_cycle(cycle)
             choix_direction = False
             dernier_mouvement_temps = temps_actuel            
             direction = serpentTete[3].value
@@ -539,13 +545,17 @@ while run:
         screen.blit(text_surface, text_rect)
         
         text_surface = font50.render("Score : " + str(score), True, BLACK)
+        text_rect = text_surface.get_rect(center=(width//2,height//4-65))
+        screen.blit(text_surface, text_rect)
+        
+        text_surface = font50.render("Cycle : " + str(cycle), True, BLACK)
         text_rect = text_surface.get_rect(center=(width//2,height//4-20))
         screen.blit(text_surface, text_rect)
         
     elif etat_app == 'jeu_perdu_ia':
         screen.fill(FOND)
         
-        bouton_menu_perdu_ia = pygame.draw.rect(screen, GRAY, (180, 350, 180, 100))
+        bouton_menu_jeu_ia = pygame.draw.rect(screen, GRAY, (180, 350, 180, 100))
         text_surface = font60.render("Menu", True, BLACK)
         text_rect = text_surface.get_rect(center=(270, 400))
         screen.blit(text_surface, text_rect)
@@ -560,8 +570,14 @@ while run:
         screen.blit(text_surface, text_rect)
         
         text_surface = font50.render("Score : " + str(score), True, BLACK)
+        text_rect = text_surface.get_rect(center=(width//2,height//4-65))
+        screen.blit(text_surface, text_rect)
+        
+        text_surface = font50.render("Cycle : " + str(cycle), True, BLACK)
         text_rect = text_surface.get_rect(center=(width//2,height//4-20))
         screen.blit(text_surface, text_rect)
+        
+        
     pygame.display.flip()
     
 pygame.quit()
