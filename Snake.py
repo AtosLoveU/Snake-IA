@@ -2,21 +2,39 @@ import pygame
 from enum import Enum
 import random
 
-taille_case = 33
-class Couleur(Enum):
-    ROUGE = 1
-    VERT = 2
-    BLEU = 3
-
-
 pygame.init()
 
-# Longueur / Hauteur
+# Type de case
+class Type_case(Enum):
+    VIDE = 0
+    POMME = 1
+    SERPENT_CORPS = 2
+    SERPENT_TETE = 3
+    
+# Type de direction (case serpent / serpentTete)
+class Type_direction(Enum):
+    HAUT = 1
+    DROITE = 2
+    BAS = -1
+    GAUCHE = -2
+
+# Longueur / Hauteur de l'application
 width = 800
 height = 495
 screen = pygame.display.set_mode((width, height))
-
+ 
+# Taille des cases
+taille_case = 33 # 18 cases par ligne / 15 cases par colonne --- 33 pixel par case
+ 
+# Etat du jeu au lancement de l'app
 etat_app = 'menu'
+
+# Modif taille IA fenetre 
+global tailleAjoutFenetre
+tailleAjoutFenetre = 200 #taille sumplémentaire de la fenetre IA pour ajout d'informations
+
+# Nombre de partie (pour l'IA)
+nombrePartie = 0
 
 # Couleurs
 FOND = (200,200,200)
@@ -27,8 +45,6 @@ BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 SERPENT_CORPS_COULEUR = (72, 235, 54)
-SERPENT_TETE_COULEUR = (33, 112, 25)
-POMME_COULEUR = (179, 20, 20)
 
 # Image
 image_tete_serpent_bas = pygame.image.load("ressources/tete_serpent.png")
@@ -40,45 +56,18 @@ image_tete_serpent_gauche = pygame.transform.rotate(image_tete_serpent_bas, 270)
 image_pomme = pygame.image.load("ressources/pomme.png")
 image_pomme = pygame.transform.scale(image_pomme, (taille_case,taille_case))
 
-
 # Texte 
-
 font40 = pygame.font.Font(None, 40)
 font50 = pygame.font.Font(None, 50)
 font60 = pygame.font.Font(None, 60)
 font80 = pygame.font.Font(None, 80)
 
-# Type de case 
-class Type_case(Enum):
-    VIDE = 0
-    POMME = 1
-    SERPENT_CORPS = 2
-    SERPENT_TETE = 3
-    
-# Type de direction (case serpent)
-class Type_direction(Enum):
-    HAUT = 1
-    DROITE = 2
-    BAS = -1
-    GAUCHE = -2
 
-
- # ratio 6/5 zone de jeu
- # 18/15, 33.33 par case
-
-# Creation du tableau de jeu
-list_case = []
-for i in range(18):
-    for j in range(15):
-        case = [i,j,Type_case.VIDE.value] 
-        # case = [pos_x_longueur, pos_y_hauteur, type de case]
-        list_case.append(case)
-
+# Fonction du jeu
 def coordonnées_case(case):
     return (case[0]*taille_case,case[1]*taille_case)
 
-
-# Fonction du jeu
+    # Creation du jeu humain
 global jeu_cree
 jeu_cree = False
 def creation_jeu_humain():
@@ -109,10 +98,9 @@ def creation_jeu_humain():
     text_rect = text_surface.get_rect(center=(670,110))
     screen.blit(text_surface, text_rect)
     
-    placement_serpent_pomme_depart()
+    placement_serpent_depart()
     maj_affichage_score(0)
     maj_affichage_cycle(0)
-    
     placement_pomme()
 
 def creation_jeu_ia():
@@ -139,41 +127,29 @@ def creation_jeu_ia():
     text_rect = text_surface.get_rect(center=(680,110))
     screen.blit(text_surface, text_rect)
     
-    placement_serpent_pomme_depart()
+    placement_serpent_depart()
     maj_affichage_score(0)
     maj_affichage_cycle(0)
     
     placement_pomme()
     
-def modif_type_case(case, nouveau_type):
-    list_case[numeroCaseDans_liste_case(case)][2] = nouveau_type.value
-    
-def modif_direction_serpent(case,nouvel_direction):
-    list_case[numeroCaseDans_liste_case(case)][3] = nouvel_direction.value
 
-def placement_serpent_pomme_depart():
+
+
+def placement_serpent_depart():
     global serpentTete, list_serpent
     serpent1 = [4,7,Type_case.SERPENT_CORPS,Type_direction.DROITE]
     serpent2 = [5,7,Type_case.SERPENT_CORPS,Type_direction.DROITE]
     serpent3 = [6,7,Type_case.SERPENT_CORPS,Type_direction.DROITE]
     serpentTete = [7,7,Type_case.SERPENT_TETE,Type_direction.DROITE]
-    #placement du serpent
-    modif_type_case([serpent1[0],serpent1[1]], Type_case.SERPENT_CORPS)
-    modif_type_case([serpent2[0],serpent2[1]], Type_case.SERPENT_CORPS)
-    modif_type_case([serpent3[0],serpent3[1]], Type_case.SERPENT_CORPS)
-    modif_type_case([serpentTete[0],serpentTete[1]], Type_case.SERPENT_TETE)
-    pomme = [0,0]
-    modif_type_case(pomme, Type_case.POMME)
+    
+    # placement du serpent
     list_serpent = [serpent3,serpent2,serpent1]
     
-    # pygame.draw.rect(screen, SERPENT_TETE_COULEUR, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1], taille_case, taille_case))
     screen.blit(image_tete_serpent_droite, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
     for i in list_serpent:
         #maj corps serpent dessin
         pygame.draw.rect(screen, SERPENT_CORPS_COULEUR, (coordonnées_case(i)[0], coordonnées_case(i)[1], taille_case, taille_case))
-
-def numeroCaseDans_liste_case(coordonnées):
-    return coordonnées[0] + coordonnées[1] * 15
 
 def placement_pomme():
     pomme_placée = False
@@ -209,19 +185,13 @@ def joue_aléatoirement():
     elif rdm == 4:
         return Type_direction.DROITE
 
-    
-
-# Temps 
-global tailleAjoutFenetre
-nombrePartie = 0
-tailleAjoutFenetre = 200 #taille sumplémentaire de la fenetre IA pour ajout d'informations
-
 
 # Application
 run = True
 while run:
     temps_actuel = pygame.time.get_ticks()
-    """
+    # test IA
+    
     if etat_app == 'jeu_perdu_ia':
             
             if score < 2:
@@ -232,13 +202,11 @@ while run:
                 print("Nombre de partie pour atteindre 2 : " + str(nombrePartie))
                 nombrePartie = 0
                 break
-    """
-                
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
-        
-        
+    
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y = event.pos
             
@@ -249,15 +217,14 @@ while run:
                     etat_app = 'jeu_humain'
                     dernier_mouvement_temps = 0
                     intervale_temps = 200
+                    screen = pygame.display.set_mode((width, height))
                 if bouton_menu_IA.collidepoint(x, y):
                     #MODE IA
                     etat_app = 'jeu_ia'
                     dernier_mouvement_temps = 0
-                    intervale_temps = 1000
+                    intervale_temps = 1
                     screen = pygame.display.set_mode((width + tailleAjoutFenetre, height))
-
                 
-            
             #JEU_HUMAIN
             elif etat_app == 'jeu_humain':
                 if bouton_restart_jeu_humain.collidepoint(x, y):
@@ -269,7 +236,7 @@ while run:
                     jeu_cree = False
                     etat_app = 'menu'
             
-            #jeu_ia
+            #JEU_IA
             elif etat_app == 'jeu_ia':
                 if bouton_menu_jeu_ia.collidepoint(x,y):
                     jeu_cree = False
@@ -281,13 +248,12 @@ while run:
                     jeu_cree = False
                     etat_app = 'jeu_humain'
                     
-
                 if bouton_menu_perdu_humain.collidepoint(x, y):
                     jeu_cree = False
                     etat_app = 'menu'
+                    
             #PERDU_IA
             elif etat_app == 'jeu_perdu_ia':
-                
                 if bouton_restart_perdu_ia.collidepoint(x, y):
                     jeu_cree = False
                     etat_app = 'jeu_ia'
@@ -309,13 +275,6 @@ while run:
             elif (event.key == pygame.K_RIGHT  or event.key == pygame.K_d) and serpentTete[3] != Type_direction.GAUCHE and not choix_direction:  # aller a droite
                 serpentTete[3] = Type_direction.DROITE
                 choix_direction = True
-                #cheat
-            elif event.key == pygame.K_y:
-                list_serpent.append([ancien_serpent_x,ancien_serpent_y,Type_case.SERPENT_CORPS,ancien_serpent_direction])
-                score += 1
-                maj_affichage_score(score)
-            
-
                 
     # Selection de l'ecran
     if etat_app == 'menu':
@@ -338,7 +297,6 @@ while run:
         screen.blit(text_surface, text_rect)
     
     elif etat_app == 'jeu_humain':
-
         if not jeu_cree:
             screen.fill(WHITE)
             creation_jeu_humain()
@@ -356,7 +314,7 @@ while run:
             
             ancienne_position_tete = serpentTete[:2]
             ancienne_direction_tete = serpentTete[3]
-        
+            
             #déplacement avec check colision murs
             
             if direction == Type_direction.BAS.value:
@@ -382,15 +340,14 @@ while run:
                     serpentTete[0] -= 1
                 else:
                     etat_app = 'jeu_perdu_humain'
-                    
-            
                 
+            #deplacement du corps du serpent
+            
             ancien_serpent_x = list_serpent[-1][0]
             ancien_serpent_y = list_serpent[-1][1]
             ancien_serpent_direction = list_serpent [-1][3]
-            #deplacement du corps du serpent
+            
             for i in range(len(list_serpent)):
-                
                 ancienne_position_segment = list_serpent[i][:2]
                 ancienne_direction_segment = list_serpent[i][3]
         
@@ -402,12 +359,12 @@ while run:
                 ancienne_position_tete = ancienne_position_segment
                 ancienne_direction_tete = ancienne_direction_segment
             
-            # colision avec son propre corps
+            # Collision avec son propre corps
             for i in list_serpent:
                 if serpentTete[:2] == i[:2]:
                     etat_app = 'jeu_perdu_humain'
                 
-            # colistion avec une pomme
+            # Collision avec une pomme
             if serpentTete[:2] == pomme[:2]:
                 list_serpent.append([ancien_serpent_x,ancien_serpent_y,Type_case.SERPENT_CORPS,ancien_serpent_direction])
                 score += 1
@@ -424,22 +381,14 @@ while run:
             if serpentTete[3] == Type_direction.GAUCHE:
                 screen.blit(image_tete_serpent_gauche, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
 
-            # pygame.draw.rect(screen, SERPENT_TETE_COULEUR, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1], taille_case, taille_case))
             for i in list_serpent:
                 #maj corps serpent dessin
                 pygame.draw.rect(screen, SERPENT_CORPS_COULEUR, (coordonnées_case(i)[0], coordonnées_case(i)[1], taille_case, taille_case))
-                
-            
-
-
-
            
     elif etat_app == 'jeu_ia':
-    
         if not jeu_cree:
             screen.fill(WHITE)
-            pygame.draw.rect(screen, FOND, (width, 0, tailleAjoutFenetre, height))
-
+            pygame.draw.rect(screen, FOND, (width, 0, tailleAjoutFenetre, height)) # Ajout parti supplémentaire pour les informations de l'IA
             creation_jeu_ia()
             jeu_cree = True
         
@@ -487,12 +436,11 @@ while run:
                 else:
                     etat_app = 'jeu_perdu_ia'
                     
-            
-                
+            #deplacement du corps du serpent
             ancien_serpent_x = list_serpent[-1][0]
             ancien_serpent_y = list_serpent[-1][1]
             ancien_serpent_direction = list_serpent [-1][3]
-            #deplacement du corps du serpent
+            
             for i in range(len(list_serpent)):
                 
                 ancienne_position_segment = list_serpent[i][:2]
@@ -528,7 +476,6 @@ while run:
             if serpentTete[3] == Type_direction.GAUCHE:
                 screen.blit(image_tete_serpent_gauche, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
 
-            # pygame.draw.rect(screen, SERPENT_TETE_COULEUR, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1], taille_case, taille_case))
             for i in list_serpent:
                 #maj corps serpent dessin
                 pygame.draw.rect(screen, SERPENT_CORPS_COULEUR, (coordonnées_case(i)[0], coordonnées_case(i)[1], taille_case, taille_case))
