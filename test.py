@@ -2,8 +2,6 @@ import numpy as np
 import random
 
 # Configuration de la grille
-TAILLE_GRILLE_X = 18
-TAILLE_GRILLE_Y = 15
 TAILLE_VISION = 5
 list_actions_ia = ('haut', 'droite', 'bas', 'gauche')
 
@@ -16,14 +14,11 @@ def choisir_action(q_table, etat, epsilon=0.1):
         # Choix aléatoire pour explorer
         return random.choice(list_actions_ia)
     else:
-        # Choix de l'action ayant la valeur Q maximale
+        # Choix de l'action aléatoire parmi les valeurs Q maximales
         q_values = get_q_table(q_table, etat)
-        if (q_values.get('haut') == q_values.get('droite') and
-            q_values.get('droite') == q_values.get('bas') and
-            q_values.get('bas') == q_values.get('gauche')):
-            return random.choice(list_actions_ia)
-        else:
-            return max(q_values, key=q_values.get)
+        max_value = max(q_values.values())  # Trouver la valeur Q maximale
+        meilleures_actions = [action for action, valeur in q_values.items() if valeur == max_value]
+        return random.choice(meilleures_actions)
             
 
 def generer_etat(serpentTete, list_serpent, pomme):
@@ -61,8 +56,8 @@ def mise_a_jour_q_learning(q_table, etat, action, reward, etat_suivant, alpha=0.
 # Générer une nouvelle pomme
 def generer_nouvelle_pomme(list_serpent):
     while True:
-        rdm_x = random.randint(0, TAILLE_GRILLE_X - 1)
-        rdm_y = random.randint(0, TAILLE_GRILLE_Y - 1)
+        rdm_x = random.randint(0, 17)
+        rdm_y = random.randint(0, 14)
         if all(segment != [rdm_x, rdm_y] for segment in list_serpent):
             return [rdm_x, rdm_y]
 
@@ -85,7 +80,7 @@ def simuler_action(serpentTete, list_serpent, action, pomme):
     if nouvelle_tete == pomme:
         reward = 20
         pomme = generer_nouvelle_pomme(list_serpent + [nouvelle_tete])
-    elif nouvelle_tete in list_serpent or not (0 <= x < TAILLE_GRILLE_X and 0 <= y < TAILLE_GRILLE_Y):
+    elif nouvelle_tete in list_serpent or not (0 <= x < 18 and 0 <= y < 15):
         reward = -20
         done = True
     else:
@@ -128,6 +123,6 @@ def entrainer(q_table, episodes=10, alpha=0.1, gamma=0.9, epsilon=0.1, max_steps
                 break
 
 # Tester l'entraînement
-entrainer(Q_table, episodes=5)
+entrainer(Q_table, episodes=10)
 print(Q_table)
 print(len(Q_table))
