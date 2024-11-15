@@ -1,6 +1,7 @@
 import pygame
 from enum import Enum
 import random
+import numpy as np
 
 pygame.init()
 
@@ -61,6 +62,7 @@ font40 = pygame.font.Font(None, 40)
 font50 = pygame.font.Font(None, 50)
 font60 = pygame.font.Font(None, 60)
 font80 = pygame.font.Font(None, 80)
+
 
 
 # Fonction du jeu
@@ -186,6 +188,90 @@ def joue_aléatoirement():
         return Type_direction.DROITE
 
 
+#IA
+TAILLE_GRILLE_VISIBLE = 5
+list_actions_ia = (Type_direction.DROITE,Type_direction.BAS,Type_direction.GAUCHE,Type_direction.HAUT)
+
+def etat():
+    return (tuple(list_serpent), serpentTete, pomme)
+
+# Q-table dictionnaire
+Q_table = {}
+
+# renvoie les valeurs de Q pour un état
+def get_q_table(q_table_actuel, etat):
+    if etat not in q_table_actuel:
+        q_table_actuel[etat] = {action: 0 for action in list_actions_ia} # Si l'état n'était pas dans la table, il est ajouté avec toutes les actions mise à 1 de valeur
+    return q_table_actuel[etat]
+
+# met à jour la valeur de Q pour un état-action donné
+def update_q_table(q_table, etat, action, valeur):
+    if etat not in q_table:
+        q_table[etat] = {a: 0 for a in list_actions_ia} # Si l'état n'était pas dans la table, il est ajouté avec toutes les actions mise à 1 de valeur
+    # maj table
+    q_table[etat][action] = valeur
+
+# choisir action (epsilon-greedy)
+def choisir_action(q_table, etat, epsilon=0.1):
+    if random.uniform(0, 1) < epsilon:
+        # Choix aléatoire pour explorer
+        return random.choice(list_actions_ia)
+    else:
+        # Choix de l'action ayant la valeur Q maximale
+        q_values = get_q_table(q_table, etat,None)
+        return max(q_values, key=q_values.get)
+    
+def generer_etat(serpentTete, list_serpent, pomme):
+    # Création d'une zone 5x5 autour de la tête du serpent
+    etatGrilleVisible = np.zeros((TAILLE_GRILLE_VISIBLE, TAILLE_GRILLE_VISIBLE), dtype=int)
+
+    # Position du serpent tête
+    x, y = serpentTete[0], serpentTete[1]
+
+    for seg in list_serpent:
+        dx = seg[0] - x + 2
+        dy = seg[1] - y + 2
+        if 0 <= dx < TAILLE_GRILLE_VISIBLE and 0 <= dy < TAILLE_GRILLE_VISIBLE:
+            etatGrilleVisible[dx][dy] = 1
+    return (serpentTete, pomme, etatGrilleVisible)
+
+
+def calcul_récompense():
+    if pomme == serpentTete[:2]:
+        return 20
+    for segment in list_serpent:
+        if serpentTete[:2] == segment[:2]:        
+            return -20
+    if serpentTete[0] < 0 or serpentTete[0] > 17 or serpentTete [1] < 0 or serpentTete[1] > 14:
+        return -20
+    else: 
+        return -1
+
+
+# A FAIRE
+def entrainer(q_table, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1):
+    for _ in range(episodes):
+        # Réinitialiser l'état du jeu
+        jeu_cree = False
+        etat_actuel = generer_etat(serpentTete, list_serpent, pomme)
+        
+        while True:  # Jusqu'à la fin de l'épisode
+            # Choisir une action
+            action = choisir_action(q_table, etat_actuel, epsilon)
+            
+            # Calculer le nouvel état après l'action
+            nouvel_etat, reward, done = simuler_action(serpentTete, list_serpent, action, pomme)
+            
+            # Mise à jour de la Q-table
+            mise_a_jour_q_learning(q_table, etat_actuel, action, reward, nouvel_etat, alpha, gamma)
+            
+            # Passer à l'état suivant
+            etat_actuel = nouvel_etat
+            
+            if done:  # Si le jeu est terminé, on passe à l'épisode suivant
+                break
+
+
 # Application
 run = True
 while run:
@@ -194,12 +280,12 @@ while run:
     
     if etat_app == 'jeu_perdu_ia':
             
-            if score < 2:
+            if score < 3:
                 nombrePartie += 1
                 jeu_cree = False
                 etat_app = 'jeu_ia'
             else:
-                print("Nombre de partie pour atteindre 2 : " + str(nombrePartie))
+                print("Nombre de partie pour atteindre 4 : " + str(nombrePartie))
                 nombrePartie = 0
                 break
     
@@ -216,7 +302,7 @@ while run:
                     #MODE HUMAIN
                     etat_app = 'jeu_humain'
                     dernier_mouvement_temps = 0
-                    intervale_temps = 200
+                    intervale_temps = 1000
                     screen = pygame.display.set_mode((width, height))
                 if bouton_menu_IA.collidepoint(x, y):
                     #MODE IA
@@ -275,6 +361,11 @@ while run:
             elif (event.key == pygame.K_RIGHT  or event.key == pygame.K_d) and serpentTete[3] != Type_direction.GAUCHE and not choix_direction:  # aller a droite
                 serpentTete[3] = Type_direction.DROITE
                 choix_direction = True
+            #cheat
+            elif event.key == pygame.K_y:
+                list_serpent.append([ancien_serpent_x,ancien_serpent_y,Type_case.SERPENT_CORPS,ancien_serpent_direction])
+                score += 1
+                maj_affichage_score(score)
                 
     # Selection de l'ecran
     if etat_app == 'menu':
@@ -307,7 +398,8 @@ while run:
             choix_direction = False
             cycle += 1
             maj_affichage_cycle(cycle)
-
+            print(generer_etat(serpentTete,list_serpent,pomme))
+            print("-------------------------------")
             dernier_mouvement_temps = temps_actuel            
             direction = serpentTete[3].value
             x,y = serpentTete[0],serpentTete[1]
@@ -399,8 +491,10 @@ while run:
             choix_direction = False
             dernier_mouvement_temps = temps_actuel            
             direction = serpentTete[3].value
-            x,y = serpentTete[0],serpentTete[1]
-            
+            x,y = serpentTete[0],serpentTete[1]               
+            # Test
+            print(generer_etat(serpentTete,list_serpent,pomme))
+            print("-------------------------------")
             #joue aléatoirement
             direction_aleatoire = joue_aléatoirement()
             if direction_aleatoire.value != direction*-1:
