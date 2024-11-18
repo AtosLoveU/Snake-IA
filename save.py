@@ -139,8 +139,8 @@ def creation_jeu_ia():
     placement_pomme()
     
 
-global ancienne_action_ia
-ancienne_action_ia = Type_direction.DROITE
+
+
 def placement_serpent_depart():
     global serpentTete, list_serpent
     serpent1 = [4,7,Type_case.SERPENT_CORPS,Type_direction.DROITE]
@@ -205,8 +205,12 @@ Q_table = {}
 # renvoie les valeurs de Q pour un état
 def get_q_table(q_table, etat):
     if etat not in q_table:
-        q_table[etat] = {action: 0 for action in list_actions_ia} # Si l'état n'était pas dans la table, il est ajouté avec toutes les actions mise à 1 de valeur
+        q_table[etat] = {
+            action: 0 for action in list_actions_ia
+            if action.value != -etat[1].value  # Exclure les actions opposées à la direction actuelle
+        }
     return q_table[etat]
+
 
 # met à jour la valeur de Q pour un état-action donné
 def update_q_table(q_table, etat, action, valeur):
@@ -216,27 +220,32 @@ def update_q_table(q_table, etat, action, valeur):
     q_table[etat][action] = valeur
 
 # Choisir une action (epsilon-greedy)
-def choisir_action(q_table, etat, epsilon=0.1):
+def choisir_action_ia(q_table, etat, epsilon=0.1):
     if random.uniform(0, 1) < epsilon:
         # Choix aléatoire pour explorer
-        list_action_sans_opposé = list_actions_ia.pop(ancienne_action_ia)
-        return random.choice(list_action_sans_opposé)            
+        q_values = get_q_table(q_table, etat)
+        actions = [action for action, valeur in q_values.items()]  # Crée une liste des actions
+        return random.choice(actions)
+
     else:
         # Choix de l'action aléatoire parmi les valeurs Q maximales
         q_values = get_q_table(q_table, etat)
+
         max_value = max(q_values.values())  # Trouver la valeur Q maximale
-        # Verification que les meilleurs actions ne soit pas la direction opposé a la direction actuelle
-        meilleures_actions = [action for action, valeur in q_values.items() if valeur == max_value and action.value != ancienne_action_ia.value*(-1)]
-        print("ancienne action ia CHOISIR : " + str(ancienne_action_ia)) 
-        print("meilleurs action : " + str(meilleures_actions))
+        meilleures_actions = [
+            action for action, valeur in q_values.items()
+            if valeur == max_value
+        ]
         rdm_choix = random.choice(meilleures_actions)
-        print(rdm_choix)
+        
         return rdm_choix
     
+# Mettre à jour la Q-table pour inclure la direction de la tête
 def generer_etat(serpentTete, list_serpent, pomme):
     # Création d'une zone de vision autour de la tête du serpent
     etatGrille = np.zeros((TAILLE_VISION, TAILLE_VISION), dtype=int)
     x, y = serpentTete[:2]
+    direction = serpentTete[3]  # Inclure la direction dans l'état
 
     for seg in list_serpent:
         dx = seg[0] - x + 2
@@ -244,7 +253,7 @@ def generer_etat(serpentTete, list_serpent, pomme):
         if 0 <= dx < TAILLE_VISION and 0 <= dy < TAILLE_VISION:
             etatGrille[dx][dy] = 1
 
-    return (tuple(serpentTete), tuple(pomme), tuple(map(tuple, etatGrille)))
+    return (tuple(serpentTete[:2]), direction, tuple(pomme), tuple(map(tuple, etatGrille)))
 
 
 def calcul_récompense():
@@ -265,6 +274,7 @@ def mise_a_jour_q_learning(q_table, etat, action, reward, etat_suivant, alpha=0.
     nouvelle_valeur = valeur_actuelle + alpha * (reward + gamma * max_q_suivant - valeur_actuelle)
     update_q_table(q_table, etat, action, nouvelle_valeur)
 
+
 # Simuler une action
 
 def simuler_action(serpentTete, list_serpent, action, pomme):
@@ -279,7 +289,7 @@ def simuler_action(serpentTete, list_serpent, action, pomme):
     elif action == Type_direction.DROITE:
         x += 1
 
-    nouvelle_tete = [x, y]
+    nouvelle_tete = [x, y,Type_case.SERPENT_TETE,action]
     done = False
 
     # Vérifier conditions de fin et récompenses
@@ -304,20 +314,16 @@ def simuler_action(serpentTete, list_serpent, action, pomme):
 # Entraîner l'agent
 def entrainer(q_table, episodes=10, alpha=0.1, gamma=0.9, epsilon=0.1, max_steps=100):
     for episode in range(episodes):
-        print(f"--- Épisode {episode + 1} ---")
         # Initialiser l'état
         placement_serpent_depart()
         placement_pomme()
-        serpentTeteEntrainement = serpentTete[:2]
+        serpentTeteEntrainement = serpentTete
         list_serpentEntrainement = [segment[:2] for segment in list_serpent]
         pommeEntrainement = pomme[:2]
         etat_actuel = generer_etat(serpentTeteEntrainement, list_serpentEntrainement, pommeEntrainement)
         for step in range(max_steps):
             # Choisir une action
-            action = choisir_action(q_table, etat_actuel, epsilon)
-            ancienne_action_ia = action
-            print("ancienne action ia ENTRAINER : " + str(ancienne_action_ia))
-            print("---")
+            action = choisir_action_ia(q_table, etat_actuel, epsilon)
             # Simuler l'action
             nouvel_etat, reward, done, list_serpentEntrainement, pommeEntrainement = simuler_action(serpentTeteEntrainement, list_serpentEntrainement, action, pomme)
             # Mise à jour de la Q-table
@@ -326,17 +332,37 @@ def entrainer(q_table, episodes=10, alpha=0.1, gamma=0.9, epsilon=0.1, max_steps
             etat_actuel = nouvel_etat
             serpentTeteEntrainement = list_serpentEntrainement[-1]
 
-            print(f"Étape {step + 1}, Action : {action}, Reward : {reward}, Tête : {serpentTeteEntrainement}, Pomme : {pommeEntrainement}")
 
             if done:
-                print(f"Fin de l'épisode à l'étape {step + 1}")
                 break
 
 
-# Application
-entrainer(Q_table, episodes=1)
+def choisir_action_jeu(q_table, etat, epsilon=0.1):
+    # Choix de l'action aléatoire parmi les valeurs Q maximales
+    q_values = get_q_table(q_table, etat)
 
-run = False
+    max_value = max(q_values.values())  # Trouver la valeur Q maximale
+    meilleures_actions = [
+        action for action, valeur in q_values.items()
+        if valeur == max_value
+    ]
+    rdm_choix = random.choice(meilleures_actions)
+    return rdm_choix
+
+
+
+
+
+
+
+
+
+
+# Application
+entrainer(Q_table, episodes=10000)
+print("#########################")
+
+run = True
 while run:
     temps_actuel = pygame.time.get_ticks()
     """
@@ -373,7 +399,7 @@ while run:
                     #MODE IA
                     etat_app = 'jeu_ia'
                     dernier_mouvement_temps = 0
-                    intervale_temps = 50
+                    intervale_temps = 200
                     screen = pygame.display.set_mode((width + tailleAjoutFenetre, height))
                 
             #JEU_HUMAIN
@@ -555,41 +581,42 @@ while run:
             maj_affichage_cycle(cycle)
             choix_direction = False
             dernier_mouvement_temps = temps_actuel            
-            direction = serpentTete[3].value
+            #direction = serpentTete[3].value
             x,y = serpentTete[0],serpentTete[1]               
-            # Test
-            print(generer_etat(serpentTete,list_serpent,pomme))
-            print("-------------------------------")
-            #joue aléatoirement
-            direction_aleatoire = joue_aléatoirement()
-            if direction_aleatoire.value != direction*-1:
-                serpentTete[3] = direction_aleatoire
-                choix_direction = True
             
+            #joue IA
+            print("--------" + str(cycle))
+            direction = choisir_action_jeu(Q_table,generer_etat(serpentTete,list_serpent,pomme))
+            print(direction)
+            print("salam : " + str(serpentTete))
+            choix_direction = True
+            
+            
+            #déplacement avec check colision murs
+            serpentTete[3] = direction
+
             ancienne_position_tete = serpentTete[:2]
             ancienne_direction_tete = serpentTete[3]
         
-            #déplacement avec check colision murs
-            
-            if direction == Type_direction.BAS.value:
+            if direction == Type_direction.BAS:
                 if y < 14:
                     serpentTete[1] += 1
                 else:
                     etat_app = 'jeu_perdu_ia'
 
-            if direction == Type_direction.DROITE.value:
+            if direction == Type_direction.DROITE:
                 if x < 17:
                     serpentTete[0] += 1
                 else:
                     etat_app = 'jeu_perdu_ia'
 
-            if direction == Type_direction.HAUT.value:
+            if direction == Type_direction.HAUT:
                 if y > 0:
                     serpentTete[1] -= 1
                 else:
                     etat_app = 'jeu_perdu_ia'
                     
-            if direction == Type_direction.GAUCHE.value:
+            if direction == Type_direction.GAUCHE:
                 if x > 0:
                     serpentTete[0] -= 1
                 else:
@@ -624,21 +651,23 @@ while run:
                 score += 1
                 maj_affichage_score(score)
                 placement_pomme()
-            
             #maj tete serpent dessin
-            if serpentTete[3] == Type_direction.BAS:
+            if direction == Type_direction.BAS:
                 screen.blit(image_tete_serpent_bas, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
-            if serpentTete[3] == Type_direction.HAUT:
+            if direction == Type_direction.HAUT:
                 screen.blit(image_tete_serpent_haut, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
-            if serpentTete[3] == Type_direction.DROITE:
+            if direction == Type_direction.DROITE:
                 screen.blit(image_tete_serpent_droite, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
-            if serpentTete[3] == Type_direction.GAUCHE:
+            if direction == Type_direction.GAUCHE:
                 screen.blit(image_tete_serpent_gauche, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
 
             for i in list_serpent:
                 #maj corps serpent dessin
                 pygame.draw.rect(screen, SERPENT_CORPS_COULEUR, (coordonnées_case(i)[0], coordonnées_case(i)[1], taille_case, taille_case))
-
+            print("_______________")
+            print(serpentTete)
+            print(list_serpent)
+            print(pomme)
     
     elif etat_app == 'jeu_perdu_humain':
         screen.fill(FOND)
