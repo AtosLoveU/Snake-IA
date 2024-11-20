@@ -231,12 +231,12 @@ def deplacer_serpent(serpentTete, list_serpent):
         ancienne_position_tete = ancienne_position_segment
         ancienne_direction_tete = ancienne_direction_segment
 
-
+REWARD_POMME = 10
 def calculer_reward(serpentTete, pomme, collision):
     if collision:
         return -20
     elif serpentTete[:2] == pomme[:2]:
-        return 10
+        return REWARD_POMME
     else:
         # Récompense basée sur la distance à la pomme
         distance_actuelle = abs(serpentTete[0] - pomme[0]) + abs(serpentTete[1] - pomme[1])
@@ -284,24 +284,26 @@ def update_q_table(q_table, etat, action, valeur):
 
 # Choisir une action (epsilon-greedy)
 def choisir_action_ia(q_table, etat, epsilon=0.2):
+    # Récupération des valeurs Q et des dangers
+    q_values = get_q_table(q_table, etat)
+    actions_sans_danger = [action for action, is_danger in dangers.items() if not is_danger]
+
+    # Si toutes les actions sont dangereuses, on doit continuer (éviter une erreur)
+    if not actions_sans_danger:
+        actions_sans_danger = list(q_values.keys())
+
+    # Exploration ou exploitation
     if random.uniform(0, 1) < epsilon:
-        # Choix aléatoire pour explorer
-        q_values = get_q_table(q_table, etat)
-        actions = [action for action, valeur in q_values.items()]  # Crée une liste des actions
-        return random.choice(actions)
-
+        # Exploration : Choisir une action sans danger au hasard
+        return random.choice(actions_sans_danger)
     else:
-        # Choix de l'action aléatoire parmi les valeurs Q maximales
-        q_values = get_q_table(q_table, etat)
-
-        max_value = max(q_values.values())  # Trouver la valeur Q maximale
+        # Exploitation : Choisir la meilleure action parmi celles sans danger
         meilleures_actions = [
-            action for action, valeur in q_values.items()
-            if valeur == max_value
+            action for action in actions_sans_danger
+            if q_values[action] == max(q_values[a] for a in actions_sans_danger)
         ]
-        rdm_choix = random.choice(meilleures_actions)
-        
-        return rdm_choix
+        return random.choice(meilleures_actions)
+
     
 # Mettre à jour la Q-table pour inclure la direction de la tête
 def generer_etat(serpentTete, list_serpent, pomme):
@@ -361,7 +363,7 @@ def simuler_action(serpentTete, list_serpent, action, pomme):
     collision = verifier_collision(nouvelle_tete, list_serpent)
     reward = calculer_reward(nouvelle_tete, pomme, collision)
 
-    if reward == 10:  # Le serpent mange la pomme
+    if reward == REWARD_POMME:  # Le serpent mange la pomme
         placement_pomme(serpentTete, list_serpent)
     elif collision:  # Collision détectée
         done = True
@@ -377,7 +379,7 @@ def simuler_action(serpentTete, list_serpent, action, pomme):
     return nouvel_etat, reward, done, nouveau_serpent, pomme, nouvelle_tete
 
 # Entraîner l'agent
-def entrainer(q_table, episodes, alpha=0.1, gamma=0.9, epsilon=0.2, max_steps=200):
+def entrainer(q_table, episodes, alpha=0.1, gamma=0.9, epsilon=0.2, max_steps=500):
     for episode in range(episodes):
         # Initialiser l'état
         if episode % (episodes/100) == 0:
@@ -405,20 +407,48 @@ def entrainer(q_table, episodes, alpha=0.1, gamma=0.9, epsilon=0.2, max_steps=20
 
 
 def choisir_action_jeu(q_table, etat):
-    # Choix de l'action aléatoire parmi les valeurs Q maximales
     q_values = get_q_table(q_table, etat)
+    actions_sans_danger = [action for action, is_danger in dangers.items() if not is_danger]
 
-    max_value = max(q_values.values())  # Trouver la valeur Q maximale
+    # Si toutes les actions sont dangereuses, on doit continuer (éviter une erreur)
+    if not actions_sans_danger:
+        actions_sans_danger = list(q_values.keys())
+
+    # Exploitation : Choisir la meilleure action parmi celles sans danger
     meilleures_actions = [
-        action for action, valeur in q_values.items()
-        if valeur == max_value
+        action for action in actions_sans_danger
+        if q_values[action] == max(q_values[a] for a in actions_sans_danger)
     ]
-    print(get_q_table(q_table, etat))
-    rdm_choix = random.choice(meilleures_actions)
-    return rdm_choix
+    return random.choice(meilleures_actions)
 
 
 
+def simuler_parties(q_table, nombre_parties=1000, max_steps=500):
+    total_score = 0
+    
+    for partie in range(nombre_parties):
+        serpentTete, list_serpent = placement_serpent_depart()
+        placement_pomme(serpentTete, list_serpent)
+        pomme = nouvelle_pomme[:2]
+        etat_actuel = generer_etat(serpentTete, list_serpent, pomme)
+        score = 0
+        done = False
+
+        for step in range(max_steps):
+            if done:
+                break
+            action = choisir_action_jeu(q_table, etat_actuel)
+            nouvel_etat, reward, done, list_serpent, pomme, serpentTete = simuler_action(
+                serpentTete, list_serpent, action, pomme
+            )
+            etat_actuel = nouvel_etat
+            if reward == REWARD_POMME:
+                score += 1
+        
+        total_score += score
+
+    score_moyen = total_score / nombre_parties
+    return score_moyen
 
 
 
@@ -427,9 +457,9 @@ def choisir_action_jeu(q_table, etat):
 
 
 # Application
-entrainer(Q_table, episodes=1000000)
-print(len(Q_table))
+entrainer(Q_table, episodes=10000)
 print("#########################")
+#print(simuler_parties(Q_table))
 
 run = True
 while run:
@@ -453,7 +483,7 @@ while run:
                     #MODE IA
                     etat_app = 'jeu_ia'
                     dernier_mouvement_temps = 0
-                    intervale_temps = 100
+                    intervale_temps = 1000
                     screen = pygame.display.set_mode((width + tailleAjoutFenetre, height))
                 
             #JEU_HUMAIN
@@ -477,7 +507,7 @@ while run:
                 if bouton_q_values.collidepoint(x,y):
                     print("-----")
                     print("danger" + str(dangers))
-                    print(aaaax,aaaay)
+                    print("Coordonnées check danger : " + str(aaaax) + str(aaaay))
                 
                 if bouton_jeu_plus_rapide.collidepoint(x,y):
                     if intervale_temps <= 100:
