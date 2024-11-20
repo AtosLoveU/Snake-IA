@@ -1,10 +1,14 @@
 import pygame
 from enum import Enum
 import random
-import numpy as np
+import pickle
+
+
 
 pygame.init()
-    
+
+
+
 # Type de direction (case serpent / serpentTete)
 class Type_direction(Enum):
     HAUT = 1
@@ -100,10 +104,11 @@ def creation_jeu_humain():
     placement_serpent_depart_visuel()
     maj_affichage_score(0)
     maj_affichage_cycle(0)
-    placement_pomme(serpentTete,list_serpent)
+    pomme = placement_pomme(serpentTete,list_serpent)
+    return pomme
 
 def creation_jeu_ia():
-    global bouton_jeu_plus_rapide, bouton_jeu_moins_rapide, bouton_menu_jeu_ia, bouton_q_values, score, cycle
+    global bouton_jeu_plus_rapide, bouton_jeu_moins_rapide, bouton_menu_jeu_ia, score, cycle #, bouton_q_values
     score = 0
     cycle = 0
     width_game = 594 #longueur du jeu
@@ -118,10 +123,12 @@ def creation_jeu_ia():
     text_rect = text_surface.get_rect(center=(700, 440))
     screen.blit(text_surface, text_rect)
     
+    """
     bouton_q_values = pygame.draw.rect(screen, GRAY, (825, 30, 130, 60))
-    text_surface = font40.render("dangers", True, BLACK)
+    text_surface = font40.render("Q-Table", True, BLACK)
     text_rect = text_surface.get_rect(center=(890, 60))
     screen.blit(text_surface, text_rect)
+    """
     
     bouton_jeu_plus_rapide = pygame.draw.rect(screen, GRAY, (825, 130, 130, 60))
     text_surface = font40.render("+ SPEED", True, BLACK)
@@ -146,7 +153,8 @@ def creation_jeu_ia():
     maj_affichage_score(0)
     maj_affichage_cycle(0)
     
-    placement_pomme(serpentTete,list_serpent)
+    pomme = placement_pomme(serpentTete,list_serpent)
+    return pomme
     
 
 
@@ -168,11 +176,12 @@ def placement_serpent_depart_visuel():
 
 def placement_pomme(serpentTete,list_serpent):
     """Positionne une pomme hors du serpent."""
-    global nouvelle_pomme
     while True:
         nouvelle_pomme = [random.randint(0, 17), random.randint(0, 14)]
+        #print("pomme départ : " + str(nouvelle_pomme))
         if nouvelle_pomme not in [serpentTete[:2]] + [segment[:2] for segment in list_serpent]:
             screen.blit(image_pomme, (coordonnées_case(nouvelle_pomme)[0], coordonnées_case(nouvelle_pomme)[1]))
+            #print("pomme final : " + str(nouvelle_pomme))
             return nouvelle_pomme
 
             
@@ -190,14 +199,13 @@ def maj_affichage_cycle(cycle):
 
 def verifier_collision(serpentTete, list_serpent):
     """Vérifie les collisions avec les murs et le corps du serpent."""
-    global aaaay, aaaax
-    aaaax, aaaay = serpentTete[:2]
+    x_c, y_c = serpentTete[:2]
     
     # Vérification mur
-    if aaaax < 0 or aaaax > 17 or aaaay < 0 or aaaay > 14:
+    if x_c < 0 or x_c > 17 or y_c < 0 or y_c > 14:
         return True
     # Vérification corps
-    if [aaaax, aaaay] in [segment[:2] for segment in list_serpent]:
+    if [x_c, y_c] in [segment[:2] for segment in list_serpent]:
         return True
     return False
 
@@ -248,7 +256,7 @@ TAILLE_GRILLE_VISIBLE = 5
 list_actions_ia = (Type_direction.BAS,Type_direction.GAUCHE,Type_direction.HAUT,Type_direction.DROITE)
 
 # Q-table dictionnaire
-Q_table = {}
+# Q_table = {}
 
 # renvoie les valeurs de Q pour un état
 def get_q_table(q_table, etat):
@@ -364,7 +372,7 @@ def simuler_action(serpentTete, list_serpent, action, pomme):
     reward = calculer_reward(nouvelle_tete, pomme, collision)
 
     if reward == REWARD_POMME:  # Le serpent mange la pomme
-        placement_pomme(serpentTete, list_serpent)
+        pomme = placement_pomme(serpentTete, list_serpent)
     elif collision:  # Collision détectée
         done = True
     # Mettre à jour le serpent
@@ -386,7 +394,7 @@ def entrainer(q_table, episodes, alpha=0.1, gamma=0.9, epsilon=0.2, max_steps=50
             print(str((episode / episodes)*100) + "%")
             
         serpentTete,list_serpent = placement_serpent_depart()
-        placement_pomme(serpentTete,list_serpent)
+        nouvelle_pomme = placement_pomme(serpentTete,list_serpent)
         serpentTeteEntrainement = serpentTete
         list_serpentEntrainement = [segment[:2] for segment in list_serpent]
         pommeEntrainement = nouvelle_pomme[:2]
@@ -404,6 +412,7 @@ def entrainer(q_table, episodes, alpha=0.1, gamma=0.9, epsilon=0.2, max_steps=50
 
             if done:
                 break
+    print("Entraintement fini")
 
 
 def choisir_action_jeu(q_table, etat):
@@ -423,45 +432,52 @@ def choisir_action_jeu(q_table, etat):
 
 
 
-def simuler_parties(q_table, nombre_parties=1000, max_steps=500):
+def simuler_parties(q_table, nombre_parties, max_steps=500):
     total_score = 0
-    
+    score_max = 0
     for partie in range(nombre_parties):
         serpentTete, list_serpent = placement_serpent_depart()
-        placement_pomme(serpentTete, list_serpent)
-        pomme = nouvelle_pomme[:2]
-        etat_actuel = generer_etat(serpentTete, list_serpent, pomme)
+        super_pomme = placement_pomme(serpentTete, list_serpent)
+        etat_actuel = generer_etat(serpentTete, list_serpent, super_pomme)
         score = 0
         done = False
-
+        
         for step in range(max_steps):
             if done:
                 break
             action = choisir_action_jeu(q_table, etat_actuel)
-            nouvel_etat, reward, done, list_serpent, pomme, serpentTete = simuler_action(
-                serpentTete, list_serpent, action, pomme
+            nouvel_etat, reward, done, list_serpent, super_pomme, serpentTete = simuler_action(
+                serpentTete, list_serpent, action, super_pomme
             )
             etat_actuel = nouvel_etat
             if reward == REWARD_POMME:
                 score += 1
-        
+        if score > score_max:
+            score_max = total_score
         total_score += score
 
     score_moyen = total_score / nombre_parties
-    return score_moyen
+    return score_moyen, score_max
+
+def save_qtable(q_table):  
+    with open("ressources/q-table.pkl", "wb") as fichier:
+        pickle.dump(q_table, fichier)
 
 
-
-
-
-
+def load_qtable():
+    with open("ressources/q-table.pkl", "rb") as fichier:
+        Q_table = pickle.load(fichier)
+        return Q_table
 
 # Application
-entrainer(Q_table, episodes=10000)
-print("#########################")
-#print(simuler_parties(Q_table))
 
-run = True
+Q_table = load_qtable() #actuellement sous 122000 episodes
+# entrainer(Q_table, episodes=100000)
+# save_qtable(Q_table)
+print("#########################")
+print(simuler_parties(Q_table,1000))
+
+run = False
 while run:
     temps_actuel = pygame.time.get_ticks()
     for event in pygame.event.get():
@@ -503,11 +519,6 @@ while run:
                     jeu_cree = False
                     etat_app = 'menu'
                     screen = pygame.display.set_mode((width, height))
-                    
-                if bouton_q_values.collidepoint(x,y):
-                    print("-----")
-                    print("danger" + str(dangers))
-                    print("Coordonnées check danger : " + str(aaaax) + str(aaaay))
                 
                 if bouton_jeu_plus_rapide.collidepoint(x,y):
                     if intervale_temps <= 100:
@@ -595,7 +606,7 @@ while run:
     elif etat_app == 'jeu_humain':
         if not jeu_cree:
             screen.fill(WHITE)
-            creation_jeu_humain()
+            pomme = creation_jeu_humain()
             jeu_cree = True
         
         #cycle temps du jeu
@@ -618,10 +629,10 @@ while run:
             if verifier_collision(serpentTete,list_serpent):
                 etat_app = 'jeu_perdu_humain'
             # Collision avec une pomme
-            if serpentTete[:2] == nouvelle_pomme[:2]:
+            if serpentTete[:2] == pomme[:2]:
                 score += 1
                 maj_affichage_score(score)
-                placement_pomme(serpentTete,list_serpent)
+                pomme = placement_pomme(serpentTete,list_serpent)
             
             #maj tete serpent dessin
             if serpentTete[2] == Type_direction.BAS:
@@ -641,7 +652,7 @@ while run:
         if not jeu_cree:
             screen.fill(WHITE)
             pygame.draw.rect(screen, FOND, (width, 0, tailleAjoutFenetre, height)) # Ajout parti supplémentaire pour les informations de l'IA
-            creation_jeu_ia()
+            pomme = creation_jeu_ia()
             jeu_cree = True
         
         #cycle temps du jeu
@@ -654,7 +665,7 @@ while run:
             x,y = serpentTete[0],serpentTete[1]               
             
             #joue IA
-            etat_jeu_ia = generer_etat(serpentTete,list_serpent,nouvelle_pomme)
+            etat_jeu_ia = generer_etat(serpentTete,list_serpent,pomme)
             direction = choisir_action_jeu(Q_table,etat_jeu_ia)
 
             choix_direction = True
@@ -714,11 +725,11 @@ while run:
                     etat_app = 'jeu_perdu_ia'
                 
             # collision avec une pomme
-            if serpentTete[:2] == nouvelle_pomme[:2]:
+            if serpentTete[:2] == pomme[:2]:
                 list_serpent.append([ancien_serpent_x,ancien_serpent_y,ancien_serpent_direction])
                 score += 1
                 maj_affichage_score(score)
-                placement_pomme(serpentTete,list_serpent)
+                pomme = placement_pomme(serpentTete,list_serpent)
             #maj tete serpent dessin
             if direction == Type_direction.BAS:
                 screen.blit(image_tete_serpent_bas, (coordonnées_case(serpentTete)[0], coordonnées_case(serpentTete)[1]))
